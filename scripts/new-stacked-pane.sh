@@ -9,6 +9,16 @@ start_path="${2:-}"
 [ -n "$current_pane" ] || current_pane="$("$TMUX_BIN" display-message -p '#{pane_id}')"
 [ -n "$start_path" ] || start_path="$("$TMUX_BIN" display-message -p -t "$current_pane" '#{pane_current_path}')"
 
+current_role="$(stacked_panes_get_pane_option "$current_pane" @stacked-panes-role real)"
+if [ "$current_role" = "placeholder" ]; then
+  backing_real="$(stacked_panes_get_pane_option "$current_pane" @stacked-panes-real '')"
+  if [ -z "$backing_real" ] || ! "$TMUX_BIN" display-message -p -t "$backing_real" '#{pane_id}' >/dev/null 2>&1; then
+    "$TMUX_BIN" display-message 'tmux-stacked-panes: cannot add pane from placeholder without backing pane' 2>/dev/null || true
+    exit 1
+  fi
+  current_pane="$backing_real"
+fi
+
 stack_id="$(stacked_panes_get_pane_option "$current_pane" @stacked-panes-id '')"
 if [ -z "$stack_id" ]; then
   stack_id="$(stacked_panes_allocate_stack_id)"

@@ -11,10 +11,16 @@ second_pane="$(active_pane_id)"
 placeholder="$(placeholder_pane_id)"
 
 $TMUX_BIN select-pane -t "$placeholder"
-TMUX_BIN="$TMUX_BIN" bash "$ROOT_DIR/scripts/on-select-pane.sh" "$placeholder"
-sleep 0.2
 
-selected="$(active_pane_id)"
+wait_timeout_seconds=2
+wait_interval_seconds=0.05
+wait_deadline=$((SECONDS + wait_timeout_seconds))
+selected=""
+while [ "$SECONDS" -le "$wait_deadline" ]; do
+  selected="$(active_pane_id)"
+  [ "$selected" = "$first_pane" ] && break
+  sleep "$wait_interval_seconds"
+done
 [ "$selected" = "$first_pane" ] || { echo "expected first pane selected, got $selected" >&2; exit 1; }
 
 first_active="$($TMUX_BIN show-options -p -t "$first_pane" -vq @stacked-panes-active)"

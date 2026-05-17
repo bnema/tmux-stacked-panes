@@ -36,12 +36,22 @@ trap cleanup_busy EXIT
 active_real=""
 while IFS=$'\t' read -r pane_id pane_stack_id pane_role pane_active; do
   [ "$pane_stack_id" = "$stack_id" ] || continue
+  [ "$pane_id" = "$selected_pane" ] && continue
   [ "$pane_role" = "real" ] || continue
   if [ "$pane_active" = "1" ]; then
     active_real="$pane_id"
     break
   fi
 done < <("$TMUX_BIN" list-panes -t "$selected_window" -F '#{pane_id}	#{@stacked-panes-id}	#{@stacked-panes-role}	#{@stacked-panes-active}')
+if [ -z "$active_real" ]; then
+  while IFS=$'\t' read -r pane_id pane_stack_id pane_role; do
+    [ "$pane_stack_id" = "$stack_id" ] || continue
+    [ "$pane_id" = "$selected_pane" ] && continue
+    [ "$pane_role" = "real" ] || continue
+    active_real="$pane_id"
+    break
+  done < <("$TMUX_BIN" list-panes -t "$selected_window" -F '#{pane_id}	#{@stacked-panes-id}	#{@stacked-panes-role}')
+fi
 
 stacked_panes_set_pane_option "$target_real" @stacked-panes-id "$stack_id"
 stacked_panes_set_pane_option "$target_real" @stacked-panes-role real

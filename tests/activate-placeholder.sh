@@ -11,10 +11,16 @@ second="$(active_pane_id)"
 placeholder="$(inactive_pane_id)"
 
 $TMUX_BIN select-pane -t "$placeholder"
-TMUX_BIN="$TMUX_BIN" bash "$ROOT_DIR/scripts/on-select-pane.sh" "$placeholder"
-sleep 0.2
 
-selected="$(active_pane_id)"
+wait_timeout_seconds=2
+wait_interval_seconds=0.05
+wait_deadline=$((SECONDS + wait_timeout_seconds))
+selected=""
+while [ "$SECONDS" -le "$wait_deadline" ]; do
+  selected="$(active_pane_id)"
+  [ "$selected" = "$first" ] && break
+  sleep "$wait_interval_seconds"
+done
 [ "$selected" = "$first" ] || { echo "expected hidden real $first activated, got selected $selected" >&2; exit 1; }
 
 second_visible="$($TMUX_BIN list-panes -t test:0 -F '#{pane_id}' | grep -Fx "$second" || true)"

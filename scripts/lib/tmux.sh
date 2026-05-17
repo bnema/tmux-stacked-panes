@@ -101,10 +101,10 @@ stacked_panes_create_placeholder_holder() {
   session="$(stacked_panes_hold_session)"
   command="$(stacked_panes_placeholder_command "$label")"
   if "$TMUX_BIN" has-session -t "=$session" 2>/dev/null; then
-    pane_id="$("$TMUX_BIN" new-window -d -P -F '#{pane_id}' -t "$session:" "$command")"
+    pane_id="$("$TMUX_BIN" new-window -d -P -F '#{pane_id}' -t "=$session:" "$command")"
   else
     pane_id="$("$TMUX_BIN" new-session -d -P -F '#{pane_id}' -s "$session" -x "$width" -y "$height" "$command")"
-    "$TMUX_BIN" set-option -q -t "$session" destroy-unattached off 2>/dev/null || true
+    "$TMUX_BIN" set-option -q -t "=$session" destroy-unattached off 2>/dev/null || true
   fi
   printf '%s' "$pane_id"
 }

@@ -24,7 +24,7 @@ for pane in "$first" "$second"; do
   visible="$($TMUX_BIN list-panes -t test:0 -F '#{pane_id}' | grep -Fx "$pane" || true)"
   [ -z "$visible" ] || { echo "expected real pane $pane hidden" >&2; exit 1; }
 done
-placeholder_count="$($TMUX_BIN list-panes -t test:0 -F '#{@stacked-panes-role}' | grep -c '^placeholder$')"
+placeholder_count="$($TMUX_BIN list-panes -t test:0 -F '#{@stacked-panes-role}' | awk '$0 == "placeholder" { count++ } END { print count + 0 }')"
 [ "$placeholder_count" = "2" ] || { echo "expected 2 placeholders, got $placeholder_count" >&2; exit 1; }
 third_height="$($TMUX_BIN display-message -p -t "$third" '#{pane_height}')"
 [ "$third_height" -gt 1 ] || { echo "expected third pane expanded, got $third_height" >&2; exit 1; }

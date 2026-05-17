@@ -7,7 +7,6 @@ setup_test_server placeholder-stack
 
 first="$($TMUX_BIN display-message -p '#{pane_id}')"
 TMUX_BIN="$TMUX_BIN" bash "$ROOT_DIR/scripts/new-stacked-pane.sh" "$first" /tmp
-sleep 0.5
 active="$(active_pane_id)"
 placeholder="$(inactive_pane_id)"
 
@@ -21,7 +20,15 @@ active_role="$($TMUX_BIN show-options -p -t "$active" -vq @stacked-panes-role)"
 first_visible="$($TMUX_BIN list-panes -t test:0 -F '#{pane_id}' | grep -Fx "$first" || true)"
 [ -z "$first_visible" ] || { echo "expected original real pane hidden, but it is still visible" >&2; exit 1; }
 
-placeholder_line="$($TMUX_BIN capture-pane -p -t "$placeholder" -S 0 -E 0 | head -1)"
+wait_timeout_seconds=2
+wait_interval_seconds=0.05
+wait_deadline=$((SECONDS + wait_timeout_seconds))
+placeholder_line=""
+while [ "$SECONDS" -le "$wait_deadline" ]; do
+  placeholder_line="$($TMUX_BIN capture-pane -p -t "$placeholder" -S 0 -E 0 | head -1)"
+  printf '%s\n' "$placeholder_line" | grep -F '○ stack' >/dev/null && break
+  sleep "$wait_interval_seconds"
+done
 printf '%s\n' "$placeholder_line" | grep -F '○ stack' >/dev/null || {
   echo "expected clean placeholder label, got: $placeholder_line" >&2
   exit 1
