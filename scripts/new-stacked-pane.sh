@@ -7,7 +7,6 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/tmux.sh"
 current_pane="${1:-}"
 start_path="${2:-}"
 [ -n "$current_pane" ] || current_pane="$("$TMUX_BIN" display-message -p '#{pane_id}')"
-[ -n "$start_path" ] || start_path="$("$TMUX_BIN" display-message -p -t "$current_pane" '#{pane_current_path}')"
 
 current_role="$(stacked_panes_get_pane_option "$current_pane" @stacked-panes-role real)"
 if [ "$current_role" = "placeholder" ]; then
@@ -18,6 +17,7 @@ if [ "$current_role" = "placeholder" ]; then
   fi
   current_pane="$backing_real"
 fi
+[ -n "$start_path" ] || start_path="$("$TMUX_BIN" display-message -p -t "$current_pane" '#{pane_current_path}')"
 
 stack_id="$(stacked_panes_get_pane_option "$current_pane" @stacked-panes-id '')"
 if [ -z "$stack_id" ]; then

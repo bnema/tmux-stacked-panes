@@ -40,7 +40,7 @@ for pane_id in "${pane_ids[@]}"; do
   if [ "$pane_id" = "$active_pane" ]; then
     stacked_panes_set_pane_option "$pane_id" @stacked-panes-active 1
   else
-    stacked_panes_unset_pane_option "$pane_id" @stacked-panes-active
+    stacked_panes_unset_pane_option "$pane_id" @stacked-panes-active || true
     "$TMUX_BIN" resize-pane -t "$pane_id" -y 1 2>/dev/null || true
   fi
 done

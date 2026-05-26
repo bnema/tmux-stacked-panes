@@ -68,18 +68,29 @@ stacked_panes_set_pane_option() {
 stacked_panes_unset_pane_option() {
   local pane_id="$1" option="$2"
   [ -n "$pane_id" ] || return 1
-  "$TMUX_BIN" set-option -p -u -q -t "$pane_id" "$option" >/dev/null 2>&1 || true
+  "$TMUX_BIN" set-option -p -u -q -t "$pane_id" "$option" >/dev/null 2>&1
 }
 
 stacked_panes_allocate_stack_id() {
-  local raw_id next_id
-  raw_id="$(stacked_panes_get_option @stacked-panes-next-id 1)"
-  case "$raw_id" in
-    ''|*[!0-9]*) raw_id=1 ;;
-  esac
-  next_id=$((raw_id + 1))
-  stacked_panes_set_option @stacked-panes-next-id "$next_id"
-  printf '%s' "$raw_id"
+  local lock_name="stacked-panes-next-id-lock"
+  (
+    local raw_id next_id
+    if ! "$TMUX_BIN" wait-for -L "$lock_name"; then
+      echo "tmux-stacked-panes: failed to acquire stack id lock" >&2
+      exit 1
+    fi
+    trap '"$TMUX_BIN" wait-for -U "$lock_name" >/dev/null 2>&1 || true' EXIT
+    raw_id="$(stacked_panes_get_option @stacked-panes-next-id 1)"
+    case "$raw_id" in
+      ''|*[!0-9]*) raw_id=1 ;;
+    esac
+    next_id=$((raw_id + 1))
+    if ! stacked_panes_set_option @stacked-panes-next-id "$next_id"; then
+      echo "tmux-stacked-panes: failed to update next stack id" >&2
+      exit 1
+    fi
+    printf '%s' "$raw_id"
+  )
 }
 
 stacked_panes_hold_session() {
@@ -101,11 +112,12 @@ stacked_panes_create_placeholder_holder() {
   session="$(stacked_panes_hold_session)"
   command="$(stacked_panes_placeholder_command "$label")"
   if "$TMUX_BIN" has-session -t "=$session" 2>/dev/null; then
-    pane_id="$("$TMUX_BIN" new-window -d -P -F '#{pane_id}' -t "=$session:" "$command")"
+    pane_id="$("$TMUX_BIN" new-window -d -P -F '#{pane_id}' -t "=$session:" "$command")" || return 1
   else
-    pane_id="$("$TMUX_BIN" new-session -d -P -F '#{pane_id}' -s "$session" -x "$width" -y "$height" "$command")"
+    pane_id="$("$TMUX_BIN" new-session -d -P -F '#{pane_id}' -s "$session" -x "$width" -y "$height" "$command")" || return 1
     "$TMUX_BIN" set-option -q -t "=$session" destroy-unattached off 2>/dev/null || true
   fi
+  [ -n "$pane_id" ] || return 1
   printf '%s' "$pane_id"
 }
 
@@ -137,13 +149,37 @@ stacked_panes_hide_real_as_placeholder() {
   label="$(stacked_panes_placeholder_label_for_real "$real_pane" "$stack_id")"
   width="$("$TMUX_BIN" display-message -p -t "$real_pane" '#{pane_width}' 2>/dev/null || printf '80')"
   height="$("$TMUX_BIN" display-message -p -t "$real_pane" '#{pane_height}' 2>/dev/null || printf '24')"
-  placeholder="$(stacked_panes_create_placeholder_holder "$label" "$width" "$height")"
-  stacked_panes_set_pane_option "$placeholder" @stacked-panes-id "$stack_id"
-  stacked_panes_set_pane_option "$placeholder" @stacked-panes-role placeholder
-  stacked_panes_set_pane_option "$placeholder" @stacked-panes-real "$real_pane"
-  stacked_panes_set_pane_option "$real_pane" @stacked-panes-id "$stack_id"
-  stacked_panes_set_pane_option "$real_pane" @stacked-panes-role real
-  stacked_panes_unset_pane_option "$real_pane" @stacked-panes-active
-  "$TMUX_BIN" swap-pane -d -s "$real_pane" -t "$placeholder"
+  if ! placeholder="$(stacked_panes_create_placeholder_holder "$label" "$width" "$height")" || [ -z "$placeholder" ]; then
+    echo "tmux-stacked-panes: failed to create placeholder holder" >&2
+    return 1
+  fi
+  if ! stacked_panes_set_pane_option "$placeholder" @stacked-panes-id "$stack_id"; then
+    echo "tmux-stacked-panes: failed to set placeholder stack id" >&2
+    return 1
+  fi
+  if ! stacked_panes_set_pane_option "$placeholder" @stacked-panes-role placeholder; then
+    echo "tmux-stacked-panes: failed to set placeholder role" >&2
+    return 1
+  fi
+  if ! stacked_panes_set_pane_option "$placeholder" @stacked-panes-real "$real_pane"; then
+    echo "tmux-stacked-panes: failed to set placeholder backing pane" >&2
+    return 1
+  fi
+  if ! stacked_panes_set_pane_option "$real_pane" @stacked-panes-id "$stack_id"; then
+    echo "tmux-stacked-panes: failed to set real pane stack id" >&2
+    return 1
+  fi
+  if ! stacked_panes_set_pane_option "$real_pane" @stacked-panes-role real; then
+    echo "tmux-stacked-panes: failed to set real pane role" >&2
+    return 1
+  fi
+  if ! stacked_panes_unset_pane_option "$real_pane" @stacked-panes-active; then
+    echo "tmux-stacked-panes: failed to unset real pane active flag" >&2
+    return 1
+  fi
+  if ! "$TMUX_BIN" swap-pane -d -s "$real_pane" -t "$placeholder"; then
+    echo "tmux-stacked-panes: failed to swap real pane into placeholder holder" >&2
+    return 1
+  fi
   printf '%s' "$placeholder"
 }

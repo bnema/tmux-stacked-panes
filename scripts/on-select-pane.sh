@@ -53,17 +53,19 @@ if [ -z "$active_real" ]; then
   done < <("$TMUX_BIN" list-panes -t "$selected_window" -F '#{pane_id}	#{@stacked-panes-id}	#{@stacked-panes-role}')
 fi
 
-stacked_panes_set_pane_option "$target_real" @stacked-panes-id "$stack_id"
-stacked_panes_set_pane_option "$target_real" @stacked-panes-role real
-stacked_panes_set_pane_option "$target_real" @stacked-panes-active 1
 if ! "$TMUX_BIN" swap-pane -d -s "$target_real" -t "$selected_pane" 2>/dev/null; then
   "$TMUX_BIN" display-message "tmux-stacked-panes: failed to activate placeholder" 2>/dev/null || true
   exit 0
 fi
+stacked_panes_set_pane_option "$target_real" @stacked-panes-id "$stack_id"
+stacked_panes_set_pane_option "$target_real" @stacked-panes-role real
+stacked_panes_set_pane_option "$target_real" @stacked-panes-active 1
 "$TMUX_BIN" kill-pane -t "$selected_pane" 2>/dev/null || true
 
 if [ -n "$active_real" ] && [ "$active_real" != "$target_real" ]; then
-  stacked_panes_hide_real_as_placeholder "$active_real" "$stack_id" >/dev/null
+  if ! stacked_panes_hide_real_as_placeholder "$active_real" "$stack_id" >/dev/null; then
+    "$TMUX_BIN" display-message "tmux-stacked-panes: failed to hide previous active pane" 2>/dev/null || true
+  fi
 fi
 
 stacked_panes_reflow "$target_real"

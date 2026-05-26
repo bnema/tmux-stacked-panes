@@ -24,6 +24,10 @@ done
 [ "$selected" = "$first_pane" ] || { echo "expected first pane selected, got $selected" >&2; exit 1; }
 
 first_active="$($TMUX_BIN show-options -p -t "$first_pane" -vq @stacked-panes-active)"
+if ! "$TMUX_BIN" display-message -p -t "$second_pane" '#{pane_id}' >/dev/null 2>&1; then
+  echo "expected second_pane target to exist before TMUX_BIN show-options query: $second_pane" >&2
+  exit 1
+fi
 second_active="$($TMUX_BIN show-options -p -t "$second_pane" -vq @stacked-panes-active 2>/dev/null || true)"
 [ "$first_active" = "1" ] || { echo "expected first pane active after select, got $first_active" >&2; exit 1; }
 [ -z "$second_active" ] || { echo "expected second pane inactive after select, got $second_active" >&2; exit 1; }
